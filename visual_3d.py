@@ -11,11 +11,32 @@ try:
 except Exception:
     tk = None
 
-from .io import PartRegistry, load_combos, resolve_combo_name
-from .parts import Combo
-from .stadium import bb10_default, Stadium
-from .physics import SimParams, simulate_duel_steps
-from .tuning import params_preset
+try:
+    from .io import PartRegistry, load_combos, resolve_combo_name
+    from .parts import Combo
+    from .stadium import bb10_default, Stadium
+    from .physics import SimParams, simulate_duel_steps
+    from .tuning import params_preset
+except Exception:
+    # Fallback to single-folder execution
+    import os, sys as _sys, importlib.util as _ilu
+    _base = os.path.dirname(__file__)
+    if _base not in _sys.path:
+        _sys.path.insert(0, _base)
+    _spec = _ilu.spec_from_file_location("io_local", os.path.join(_base, "io.py"))
+    io_local = _ilu.module_from_spec(_spec)
+    assert _spec and _spec.loader
+    _spec.loader.exec_module(io_local)
+    PartRegistry = io_local.PartRegistry
+    load_combos = io_local.load_combos
+    resolve_combo_name = io_local.resolve_combo_name
+    from parts import Combo
+    from stadium import bb10_default, Stadium
+    from physics import SimParams, simulate_duel_steps
+    try:
+        from tuning import params_preset
+    except Exception:
+        from .tuning import params_preset
 
 
 class Visual3D:

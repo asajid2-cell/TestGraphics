@@ -1,4 +1,4 @@
-from __future__ import annotations
+ï»¿from __future__ import annotations
 
 import argparse
 import math
@@ -12,10 +12,27 @@ try:
 except Exception as e:  # pragma: no cover
     tk = None
 
-from .io import PartRegistry, load_combos, resolve_combo_name
-from .parts import Combo
-from .stadium import bb10_default, Stadium
-from .physics import SimParams, simulate_duel_steps
+try:
+    from .io import PartRegistry, load_combos, resolve_combo_name
+    from .parts import Combo
+    from .stadium import bb10_default, Stadium
+    from .physics import SimParams, simulate_duel_steps
+except Exception:
+    import os, sys as _sys
+    import importlib.util as _ilu, os
+    _base = os.path.dirname(__file__)
+    if _base not in _sys.path:
+        _sys.path.insert(0, _base)
+    _spec = _ilu.spec_from_file_location("io_local", os.path.join(_base, "io.py"))
+    io_local = _ilu.module_from_spec(_spec)
+    assert _spec and _spec.loader
+    _spec.loader.exec_module(io_local)
+    PartRegistry = io_local.PartRegistry
+    load_combos = io_local.load_combos
+    resolve_combo_name = io_local.resolve_combo_name
+    from parts import Combo
+    from stadium import bb10_default, Stadium
+    from physics import SimParams, simulate_duel_steps
 
 
 class RTVisualizer:
@@ -23,7 +40,7 @@ class RTVisualizer:
         if tk is None:
             raise RuntimeError("Tkinter is not available in this Python environment.")
         self.root = tk.Tk()
-        self.root.title(" MFL Simulator — BB-10 Top-Down\)
+        self.root.title(" MFL Simulator ï¿½ BB-10 Top-Down\)
         self.width = width
         self.height = height
         self.fps = max(5.0, fps)
@@ -470,3 +487,7 @@ def main(argv: Optional[list[str]] = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+
+

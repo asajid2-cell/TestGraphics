@@ -4,12 +4,22 @@ import argparse
 from pathlib import Path
 from typing import Optional
 
-from .io import PartRegistry, load_combos, resolve_combo_name
-from .parts import Combo
-from .stadium import bb10_default
-from .simulator import run_series
-from .legality import LegalProfile
-from .legality import Catalog as LegalCatalog
+try:
+    from .io import PartRegistry, load_combos, resolve_combo_name
+    from .parts import Combo
+    from .stadium import bb10_default
+    from .simulator import run_series
+    from .legality import LegalProfile
+    from .legality import Catalog as LegalCatalog
+except Exception:
+    import os, sys as _sys
+    _sys.path.append(os.path.dirname(__file__))
+    from io import PartRegistry, load_combos, resolve_combo_name
+    from parts import Combo
+    from stadium import bb10_default
+    from simulator import run_series
+    from legality import LegalProfile
+    from legality import Catalog as LegalCatalog
 
 
 def make_combo_from_args(args, reg: PartRegistry, prefix: str) -> Combo:

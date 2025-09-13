@@ -43,7 +43,6 @@ class ControlPanel(tk.Tk):
         self.mode = tk.StringVar(value="2D")  # 2D or 3D
 
         self._build_ui()
-        self._ensure_data()
         self._load_combos()
 
     def _build_ui(self):
@@ -164,25 +163,6 @@ class ControlPanel(tk.Tk):
         except Exception as e:
             messagebox.showerror("Error", f"Failed to launch viewer:\n{e}")
 
-    def _ensure_data(self):
-        parts_sel = Path(self.parts_path.get())
-        combos_sel = Path(self.combos_path.get())
-        if parts_sel.exists() and combos_sel.exists():
-            return
-        repo_root = Path(__file__).resolve().parent.parent
-        data_dir = repo_root / "data"
-        data_dir.mkdir(parents=True, exist_ok=True)
-        parts_path = data_dir / "parts.json"
-        combos_path = data_dir / "combos.json"
-        if not parts_path.exists():
-            parts_path.write_text('{"tips":[{"name":"RF","mu_static":0.9,"mu_kinetic":0.75,"spin_friction":0.9,"stability":0.55,"shape":"RF"},{"name":"CS","mu_static":0.5,"mu_kinetic":0.35,"spin_friction":0.55,"stability":0.75,"shape":"CS"},{"name":"WD","mu_static":0.2,"mu_kinetic":0.16,"spin_friction":0.38,"stability":0.9,"shape":"WD","lad":0.5},{"name":"MF","mu_static":0.32,"mu_kinetic":0.22,"spin_friction":0.5,"stability":0.6,"shape":"MF","lad":0.1}],"tracks":[{"name":"100","height_mm":10.0,"scrape_risk":0.25},{"name":"145","height_mm":14.5,"scrape_risk":0.1},{"name":"230","height_mm":23.0,"scrape_risk":0.05}],"metal_wheels":[{"name":"Flame","mass_g":29.6,"radius_mm":21.2,"attack":0.35,"defense":0.35,"stamina":0.7,"recoil":0.3},{"name":"MeteoLDrago","mass_g":28.3,"radius_mm":21.0,"attack":0.7,"defense":0.3,"stamina":0.5,"recoil":0.8,"left_spin":true,"spin_eq":0.7},{"name":"Bakushin","mass_g":29.0,"radius_mm":21.0,"attack":0.62,"defense":0.38,"stamina":0.55,"recoil":0.5}]}'
-            ,encoding='utf-8')
-        if not combos_path.exists():
-            combos_path.write_text('{"combos":[{"name":"Flame230CS","metal":"Flame","track":"230","tip":"CS","launch_power":0.85},{"name":"Meteo145WD","metal":"MeteoLDrago","track":"145","tip":"WD","launch_power":0.8},{"name":"Bakushin145MF","metal":"Bakushin","track":"145","tip":"MF","launch_power":0.9}]}'
-            ,encoding='utf-8')
-        self.parts_path.set(str(parts_path))
-        self.combos_path.set(str(combos_path))
-
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="MFL Simulator GUI")
@@ -194,3 +174,4 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

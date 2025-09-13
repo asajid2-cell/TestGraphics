@@ -4,9 +4,16 @@ import json
 from pathlib import Path
 from typing import Tuple
 
-from .physics import SimParams
-from .stadium import Stadium
-from .parts import Combo, Tip
+try:
+    from .physics import SimParams
+    from .stadium import Stadium
+    from .parts import Combo, Tip
+except Exception:
+    import os, sys as _sys
+    _sys.path.append(os.path.dirname(__file__))
+    from physics import SimParams
+    from stadium import Stadium
+    from parts import Combo, Tip
 
 
 def apply_advanced_preset(path: str | Path, combo1: Combo, combo2: Combo, params: SimParams, stadium: Stadium) -> Tuple[Combo, Combo, SimParams, Stadium]:
