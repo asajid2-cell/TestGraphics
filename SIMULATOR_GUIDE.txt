@@ -1,0 +1,145 @@
+Beyblade Metal Fight Limited Simulator — Quick Guide (Plain Text)
+
+What This Is
+- A lightweight, tunable simulator for MFL battles in a BB-10 style stadium.
+- Approximates physics (friction, slope, inelastic collisions, KO and sleep-out).
+- Lets you run Monte Carlo matchups between part combinations.
+
+Requirements
+- Python 3.10+ installed and available on PATH.
+- No external dependencies beyond the standard library.
+
+Project Layout (key files)
+- beyblade_sim/parts.py: Part models (Tip, Track, MetalWheel, Combo).
+- beyblade_sim/physics.py: Physics integrator, collisions, KO logic, SimParams.
+- beyblade_sim/stadium.py: Stadium geometry and defaults (bb10_default).
+- beyblade_sim/simulator.py: Series runner and summary aggregation.
+- beyblade_sim/io.py: JSON loaders for parts and combos.
+- beyblade_sim/cli.py: CLI entry to run simulations.
+- data/parts.json: Example tips/tracks/wheels with placeholder values.
+- data/combos.json: Example combos for quick testing.
+
+Quick Start (from repo root)
+1) Use example combos (from data/combos.json):
+   python -m beyblade_sim.cli simulate --combo1 AggroRF --combo2 StaminaS --runs 200 --seed 42
+
+2) Specify parts directly (no combos file needed):
+   python -m beyblade_sim.cli simulate --b1-metal SampleAttack --b1-track 100 --b1-tip RF --b2-metal SampleStamina --b2-track 105 --b2-tip S --runs 200 --seed 1
+
+3) If running from another folder, pass explicit data paths:
+   python -m beyblade_sim.cli simulate --parts data/parts.json --combos data/combos.json --combo1 AggroRF --combo2 StaminaS --runs 200
+
+What You’ll See
+- Summary with Runs, A/B wins and KO counts, Draws, Win rates, and Avg battle time.
+
+Data Files (JSON formats)
+1) data/parts.json
+{
+  "tips": [
+    { "name": "RF", "mu_static": 0.9, "mu_kinetic": 0.75, "spin_friction": 0.9, "stability": 0.55, "shape": "RF" }
+  ],
+  "tracks": [
+    { "name": "100", "height_mm": 10.0, "scrape_risk": 0.25 }
+  ],
+  "metal_wheels": [
+    { "name": "SampleAttack", "mass_g": 31.0, "radius_mm": 21.5, "attack": 0.8, "defense": 0.35, "stamina": 0.45, "recoil": 0.7 }
+  ]
+}
+
+2) data/combos.json (optional)
+{
+  "combos": [
+    { "name": "AggroRF", "metal": "SampleAttack", "track": "100", "tip": "RF", "launch_power": 0.95 }
+  ]
+}
+
+How Combos Are Built
+- A Combo references a MetalWheel, Track, and Tip by name.
+- Optional fields: mass_g and radius_mm (override derived mass/radius if you have measurements).
+- launch_power (0..1) influences initial velocity/spin.
+
+Tuning Realism (beyblade_sim/physics.py: SimParams)
+- restitution: Lower values reduce bounce after collisions.
+- ko_speed_threshold: Higher values reduce KO frequency at the rim.
+- base_contact_loss: Base spin loss per contact.
+- random_spin_jitter: Randomness scale for contact spin loss.
+- max_time, min_spin: Time cap for battles and threshold where tops are considered stopped.
+
+Behavioral Levers in Part Params
+- Tip: mu_static/mu_kinetic (grip/slide), spin_friction (spin-down rate), stability (resistance to wobble).
+- Wheel: attack/defense/stamina/recoil (0..1 ratings influencing impulses and spin-loss mixing), mass_g, radius_mm.
+
+Example Scenarios (from smoke tests)
+- AggroRF vs StaminaS (200 runs, seed 3): Attack wins mostly by KO; short battles.
+- DefenseWB vs AggroRF (200 runs, seed 7): Attack dominates KOs with this early tuning; increase defense ratings or ko_speed_threshold to counter.
+
+Extending for MFL
+- Add MFL-legal parts you own to data/parts.json using measured mass/radius.
+- Add your preferred legal combos in data/combos.json.
+- (Optional) Add a legality validator: whitelist parts and enforce rules.
+
+Known Simplifications
+- 2D aggregate model: no tooth-by-tooth contact geometry or precession modeling.
+- Inelastic collisions with abstract ratings for attack/defense/recoil.
+- KO detection via outward momentum crossing the rim radius.
+- Right-spin only by default (left-spin hooks can be added if needed).
+
+Troubleshooting
+- If all outcomes are KOs: raise ko_speed_threshold and/or lower restitution.
+- If nothing KOs: lower ko_speed_threshold or increase attack/recoil ratings.
+- If one combo always wins: verify mass/radius/ratings and tip friction are realistic.
+- If the CLI cannot find combos: confirm names in data/combos.json and spelling in --combo1/--combo2.
+
+License and Responsibility
+- Provided as-is for experimentation. Validate conclusions with real testing before competitive use.
+
+RUNNING CODE (copy-paste commands)
+
+# Flame 230 CS vs Meteo L-Drago 145 WD (200 runs)
+python -m beyblade_sim.cli simulate --parts data/parts.json --b1-metal Flame --b1-track 230 --b1-tip CS --b2-metal MeteoLDrago --b2-track 145 --b2-tip WD --runs 200 --seed 99
+
+# Same matchup using predefined combos
+python -m beyblade_sim.cli simulate --combos data/combos.json --combo1 Flame230CS --combo2 Meteo145WD --runs 200 --seed 99
+
+# Validate MFL legality of combos while simulating
+python -m beyblade_sim.cli simulate --combos data/combos.json --combo1 Flame230CS --combo2 Meteo145WD --runs 100 --validate-mfl --legality data/mfl_legality.json
+
+# Direct parts with legality validation
+python -m beyblade_sim.cli simulate --parts data/parts.json --b1-metal Flame --b1-track 230 --b1-tip CS --b2-metal MeteoLDrago --b2-track 145 --b2-tip WD --runs 100 --validate-mfl --legality data/mfl_legality.json
+
+# Visualize a single battle (ASCII BB-10).
+# Use combos by name:
+python -m beyblade_sim.visual --combo1 Flame230CS --combo2 Meteo145WD --fps 40 --seed 7
+
+# Or specify parts directly:
+python -m beyblade_sim.visual --parts data/parts.json --b1-metal Flame --b1-track 230 --b1-tip CS --b2-metal MeteoLDrago --b2-track 145 --b2-tip WD --fps 40 --seed 7
+
+# Real-time top-down window (Tkinter, BB-10 circle + moving beys)
+# Use combos by name:
+python -m beyblade_sim.visual_rt --combo1 Flame230CS --combo2 Meteo145WD --fps 60 --size 900x700 --seed 7
+
+# Or specify parts directly:
+python -m beyblade_sim.visual_rt --parts data/parts.json --b1-metal Flame --b1-track 230 --b1-tip CS --b2-metal MeteoLDrago --b2-track 145 --b2-tip WD --fps 60 --size 900x700 --seed 7
+
+# Charged launch mode (hold 'L' to charge A, B random), no KOs (sleep-out only)
+python -m beyblade_sim.visual_rt --combo1 Flame230CS --combo2 Bakushin145MF --fps 60 --size 900x700 --seed 21 --charge-launch --no-ko
+
+# 3D projected stadium view (no extra installs)
+python -m beyblade_sim.visual_3d --combo1 Flame230CS --combo2 Meteo145WD --fps 60 --size 1000x700 --seed 7 --preset default
+
+# Shorthand combos (parser will split and alias):
+python -m beyblade_sim.visual_rt --combo1 EarthBull145WD --combo2 LightningLDrago100RF --fps 60 --size 900x700 --seed 3
+
+# Use MFL legality + catalog (names + aliases):
+python -m beyblade_sim.cli simulate --combo1 EarthBull145WD --combo2 LightningLDrago100RF --runs 200 --validate-mfl --legality data/mfl_legality.json --catalog data/catalog_mfl.json
+
+# --- Local AI background generation (SDXL Turbo) ---
+# USE THE GENERAL GENERATOR (imggen) — reusable for any project
+# 1) Install (CUDA + Diffusers). Choose one Torch CUDA index for your system (e.g., cu121):
+#    pip install --index-url https://download.pytorch.org/whl/cu121 torch torchvision torchaudio
+#    pip install diffusers transformers accelerate safetensors
+#    # (optional) pip install xformers
+# 2) Generate a 1024x1024 BB-10 image with SDXL Turbo and preview it:
+#    python -m imggen.cli --backend sdxl_turbo --prompt "Top-down Beyblade BB-10 Attack Type stadium, three knockout pockets at 0 deg, 120 deg, 240 deg, smooth concave bowl, visible tornado ridge, orthographic top view, high-contrast pocket cutouts, matte plastic, subtle wear, studio lighting, dark background" --size 1024x1024 --steps 4 --seed 1234 --out data/backgrounds/bb10.png --show
+# 3) Launch the visualizer (auto-loads the new background):
+#    python -m beyblade_sim.visual_rt --combo1 Flame230CS --combo2 Meteo145CS --fps 60 --size 900x700 --seed 7

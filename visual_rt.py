@@ -23,7 +23,7 @@ class RTVisualizer:
         if tk is None:
             raise RuntimeError("Tkinter is not available in this Python environment.")
         self.root = tk.Tk()
-        self.root.title("MFL Simulator â€” BB-10 Top-Down")
+        self.root.title(" MFL Simulator — BB-10 Top-Down\)
         self.width = width
         self.height = height
         self.fps = max(5.0, fps)
