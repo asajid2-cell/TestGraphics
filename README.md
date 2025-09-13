@@ -88,6 +88,4 @@ GUI Launch
   - `python launch_gui.py` (path-based launcher if `-m` has issues)
 - If you see `No module named 'beyblade_sim...'`:
   - You’re probably not in the repo root. `cd` to the folder that contains the `beyblade_sim/` directory and try again.
-=======
-Using beyblade parts to test some basic graphics
->>>>>>> cdab251c07cf7d8fb256d06e49bc96642c382350
+
