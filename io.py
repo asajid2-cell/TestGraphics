@@ -1,18 +1,25 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
-from .parts import Tip, Track, MetalWheel, Combo
+try:
+    from .parts import Tip, Track, MetalWheel, Combo
+except Exception:
+    # Single-folder fallback
+    import os, sys as _sys
+    _base = os.path.dirname(__file__)
+    if _base not in _sys.path:
+        _sys.path.insert(0, _base)
+    from parts import Tip, Track, MetalWheel, Combo
 
 
-@dataclass
 class PartRegistry:
-    tips: Dict[str, Tip]
-    tracks: Dict[str, Track]
-    metals: Dict[str, MetalWheel]
+    def __init__(self, tips: Dict[str, Tip], tracks: Dict[str, Track], metals: Dict[str, MetalWheel]):
+        self.tips = tips
+        self.tracks = tracks
+        self.metals = metals
 
     @classmethod
     def from_json(cls, path: str | Path) -> "PartRegistry":

@@ -40,7 +40,7 @@ class RTVisualizer:
         if tk is None:
             raise RuntimeError("Tkinter is not available in this Python environment.")
         self.root = tk.Tk()
-        self.root.title(" MFL Simulator � BB-10 Top-Down\)
+        self.root.title('MFL Simulator - BB-10 Top-Down')
         self.width = width
         self.height = height
         self.fps = max(5.0, fps)
@@ -400,14 +400,29 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--wall-restitution-vref", type=float, default=None)
     p.add_argument("--wall-torque-coupling", type=float, default=None)
     p.add_argument("--wall-tangent-min-keep", type=float, default=None)
+    # Engagement
+    p.add_argument("--engage-attraction-gain", type=float, default=None)
+    p.add_argument("--engage-attraction-falloff", type=float, default=None)
+    p.add_argument("--engage-orbit-gain", type=float, default=None)
 
     args = p.parse_args(argv)
-    reg = PartRegistry.from_json(args.parts)
+    # Resolve data paths relative to this script if not found in CWD
+    parts_path = Path(args.parts)
+    if not parts_path.exists():
+        alt = Path(__file__).resolve().parent.parent / 'data' / 'parts.json'
+        if alt.exists():
+            parts_path = alt
+    combos_path = Path(args.combos)
+    if not combos_path.exists():
+        altc = Path(__file__).resolve().parent.parent / 'data' / 'combos.json'
+        if altc.exists():
+            combos_path = altc
+    reg = PartRegistry.from_json(parts_path)
 
     if args.combo1 and args.combo2:
         c1 = c2 = None
-        if Path(args.combos).exists():
-            combos = load_combos(args.combos, reg)
+        if combos_path.exists():
+            combos = load_combos(combos_path, reg)
             c1 = combos.get(args.combo1)
             c2 = combos.get(args.combo2)
         if c1 is None:
@@ -435,7 +450,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     stadium = bb10_default()
     vis = RTVisualizer(width=width, height=height, fps=args.fps, stadium=stadium, allow_ko=(not args.no_ko), charge_launch=args.charge_launch, seed=args.seed, bey_size_scale=args.bey_size_scale, trail_length=args.trail_length)
     # Build params from preset
-    from .tuning import params_preset
+    try:
+        from .tuning import params_preset
+    except Exception:
+        from tuning import params_preset
     params = params_preset(args.preset)
     if args.no_ko:
         params.allow_ko = False
@@ -475,6 +493,12 @@ def main(argv: Optional[list[str]] = None) -> int:
         params.wall_torque_coupling = args.wall_torque_coupling
     if args.wall_tangent_min_keep is not None:
         params.wall_tangent_min_keep = args.wall_tangent_min_keep
+    if args.engage_attraction_gain is not None:
+        params.engage_attraction_gain = args.engage_attraction_gain
+    if args.engage_attraction_falloff is not None:
+        params.engage_attraction_falloff = args.engage_attraction_falloff
+    if args.engage_orbit_gain is not None:
+        params.engage_orbit_gain = args.engage_orbit_gain
     # Run with explicit params
     # Apply advanced preset JSON
     if args.preset_json:

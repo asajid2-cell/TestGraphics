@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from .physics import SimParams
+try:
+    from .physics import SimParams
+except Exception:
+    import os, sys as _sys
+    _base = os.path.dirname(__file__)
+    if _base not in _sys.path:
+        _sys.path.insert(0, _base)
+    from physics import SimParams
 
 
 def params_preset(name: str | None) -> SimParams:

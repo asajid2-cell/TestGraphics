@@ -70,6 +70,7 @@ class Visual3D:
         self.text_info = self.canvas.create_text(
             10, 10, anchor="nw", fill="#e0e0e0", font=("Consolas", 10), text=""
         )
+        self.result_text = None
 
     def bowl_depth(self, r: float) -> float:
         # Approximate BB-10 bowl depth: ~18mm at rim, 0 at center (for visual effect)
@@ -199,19 +200,58 @@ class Visual3D:
 
             # End condition
             if (self.allow_ko and ((a.ko and not b.ko) or (b.ko and not a.ko))) or ((not a.alive) ^ (not b.alive)):
-                msg = (
-                    f"B wins by KO at {t:.2f}s" if (self.allow_ko and a.ko and not b.ko) else
-                    f"A wins by KO at {t:.2f}s" if (self.allow_ko and b.ko and not a.ko) else
-                    f"A wins by sleep-out at {t:.2f}s" if (a.alive and not b.alive) else
-                    f"B wins by sleep-out at {t:.2f}s"
-                )
-                self.canvas.create_text(self.cx, 28, text=msg, fill="#f0f0f0", font=("Consolas", 16, "bold"))
+                if self.result_text is None:
+                    if self.allow_ko and a.ko and not b.ko:
+                        msg = f"B wins by KO at {t:.2f}s"; winner = "B"
+                    elif self.allow_ko and b.ko and not a.ko:
+                        msg = f"A wins by KO at {t:.2f}s"; winner = "A"
+                    elif a.alive and not b.alive:
+                        msg = f"A wins by sleep-out at {t:.2f}s"; winner = "A"
+                    elif b.alive and not a.alive:
+                        msg = f"B wins by sleep-out at {t:.2f}s"; winner = "B"
+                    else:
+                        msg = f"Draw at {t:.2f}s"; winner = None
+                    self._show_win_screen(msg, winner)
                 return
 
             self.root.after(self.interval_ms, tick)
 
         self.root.after(self.interval_ms, tick)
         self.root.mainloop()
+
+    def _show_win_screen(self, message: str, winner: Optional[str]):
+        # Dark overlay + simple confetti
+        self.canvas.delete("all")
+        self.draw_bowl()
+        self.canvas.create_rectangle(0, 0, self.w, self.h, fill="#000000", stipple="gray50")
+        self.canvas.create_text(self.cx, 100, text="CONGRATULATIONS!", fill="#f6da55", font=("Consolas", 26, "bold"))
+        self.canvas.create_text(self.cx, 140, text=message, fill="#e0e0e0", font=("Consolas", 16))
+        import random
+        rng = random.Random()
+        chars = ["*", "+", "o", "#", "x"]
+        colors = ["#ffd166", "#ef476f", "#06d6a0", "#118ab2", "#f6da55", "#ffffff"]
+        particles = []
+        for _ in range(140):
+            x = rng.randint(10, self.w - 10)
+            y = rng.randint(-240, -20)
+            vy = rng.uniform(1.8, 4.2)
+            ch = rng.choice(chars)
+            col = rng.choice(colors)
+            particles.append([x, y, vy, ch, col])
+
+        def animate():
+            self.canvas.delete("confetti")
+            alive = False
+            for i in range(len(particles)):
+                x, y, vy, ch, col = particles[i]
+                y += vy
+                particles[i][1] = y
+                if y < self.h - 20:
+                    alive = True
+                self.canvas.create_text(int(x), int(y), text=ch, fill=col, font=("Consolas", 10, "bold"), tags="confetti")
+            if alive:
+                self.root.after(30, animate)
+        animate()
 
 
 def make_combo_from_args(args, reg: PartRegistry, prefix: str) -> Combo:
@@ -242,6 +282,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--no-ko", action="store_true")
     p.add_argument("--preset", default="default")
     p.add_argument("--preset-json", default=None, help="Advanced preset JSON (stadium/tips/bey/launch)")
+    # Visual/dynamics convenience
+    p.add_argument("--speed-boost", type=float, default=None, help="Multiply initial linear and spin launch speeds")
+    p.add_argument("--trail-length", type=int, default=150, help="Number of trail points to keep (per bey)")
+    p.add_argument("--bey-size-scale", type=float, default=0.8, help="Scale factor for rendered bey size")
     # Optional tuning overrides
     p.add_argument("--wall-tangent-damping", type=float, default=None)
     p.add_argument("--wall-spin-loss", type=float, default=None)
@@ -259,13 +303,29 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--vel-launch-scale", type=float, default=None)
     p.add_argument("--min-spin", type=float, default=None)
     p.add_argument("--max-time", type=float, default=None)
+    # Engagement tuning
+    p.add_argument("--engage-attraction-gain", type=float, default=None)
+    p.add_argument("--engage-attraction-falloff", type=float, default=None)
+    p.add_argument("--engage-orbit-gain", type=float, default=None)
     args = p.parse_args(argv)
 
-    reg = PartRegistry.from_json(args.parts)
+    # Resolve data paths relative to this script if not found in CWD
+    parts_path = Path(args.parts)
+    if not parts_path.exists():
+        alt = Path(__file__).resolve().parent.parent / 'data' / 'parts.json'
+        if alt.exists():
+            parts_path = alt
+    combos_path = Path(args.combos)
+    if not combos_path.exists():
+        altc = Path(__file__).resolve().parent.parent / 'data' / 'combos.json'
+        if altc.exists():
+            combos_path = altc
+
+    reg = PartRegistry.from_json(parts_path)
     if args.combo1 and args.combo2:
         c1 = c2 = None
-        if Path(args.combos).exists():
-            combos = load_combos(args.combos, reg)
+        if combos_path.exists():
+            combos = load_combos(combos_path, reg)
             c1 = combos.get(args.combo1)
             c2 = combos.get(args.combo2)
         if c1 is None:
@@ -290,6 +350,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     params = params_preset(args.preset)
     if args.no_ko:
         params.allow_ko = False
+    if args.speed_boost is not None:
+        params.vel_launch_scale = (params.vel_launch_scale or 1.0) * max(0.1, args.speed_boost)
+        params.launch_spin_scale = (params.launch_spin_scale or 1.0) * max(0.1, args.speed_boost)
     if args.wall_tangent_damping is not None:
         params.wall_tangent_damping = args.wall_tangent_damping
     if args.wall_spin_loss is not None:
@@ -322,6 +385,12 @@ def main(argv: Optional[list[str]] = None) -> int:
         params.min_spin = args.min_spin
     if args.max_time is not None:
         params.max_time = args.max_time
+    if args.engage_attraction_gain is not None:
+        params.engage_attraction_gain = args.engage_attraction_gain
+    if args.engage_attraction_falloff is not None:
+        params.engage_attraction_falloff = args.engage_attraction_falloff
+    if args.engage_orbit_gain is not None:
+        params.engage_orbit_gain = args.engage_orbit_gain
 
     stadium = bb10_default()
     # Apply advanced preset JSON before constructing renderer so bowl radii are correct visually
@@ -329,7 +398,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         from .advanced_preset import apply_advanced_preset
         c1, c2, params, stadium = apply_advanced_preset(args.preset_json, c1, c2, params, stadium)
 
-    vis = Visual3D(width, height, args.fps, stadium, allow_ko=not args.no_ko)
+    vis = Visual3D(width, height, args.fps, stadium, allow_ko=not args.no_ko, bey_size_scale=args.bey_size_scale, trail_length=max(40, int(args.trail_length)))
     vis.run(c1, c2, params=params, seed=args.seed)
     return 0
 

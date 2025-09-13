@@ -5,8 +5,16 @@ import random
 from dataclasses import dataclass
 from typing import Tuple
 
-from .parts import Combo
-from .stadium import Stadium
+try:
+    from .parts import Combo
+    from .stadium import Stadium
+except Exception:
+    import os, sys as _sys
+    _base = os.path.dirname(__file__)
+    if _base not in _sys.path:
+        _sys.path.insert(0, _base)
+    from parts import Combo
+    from stadium import Stadium
 
 
 Vec = Tuple[float, float]
@@ -75,19 +83,44 @@ class SimParams:
     # Global scaling knobs for calibration
     spin_loss_scale: float = 1.0    # scale rotational spin-down
     lin_fric_scale: float = 1.0     # scale linear kinetic friction
-    slope_scale: float = 1.0        # scale bowl slope pull toward center
+    slope_scale: float = 1.15       # scale bowl slope pull toward center (drift inward)
     launch_spin_scale: float = 1.0  # scale initial spin imparted at launch
     contact_loss_scale: float = 1.0 # scale spin loss on collisions
     vel_launch_scale: float = 1.0   # scale initial linear launch speed
     # Wall behavior
-    wall_tangent_damping: float = 0.98  # 1.0 = no tangential loss on bounce
-    wall_spin_loss: float = 0.4         # spin lost on wall contact (rads)
-    wall_min_speed_keep: float = 0.9    # ensure post-bounce speed >= keep * pre-bounce when KOs are off
-    wall_tangent_min_keep: float = 0.92 # keep at least this fraction of tangential speed on bounce
-    wall_reentry_radial: float = 0.25   # m/s minimal inward radial speed after bounce (KO off)
-    wall_restitution_boost: float = 0.15 # extra restitution scaled by impact normal speed (KO off)
+    wall_tangent_damping: float = 0.99  # closer to no tangential loss
+    wall_spin_loss: float = 0.15        # much lower spin loss on wall contact (rads)
+    wall_min_speed_keep: float = 0.95   # keep most of pre-bounce speed when KOs are off
+    wall_tangent_min_keep: float = 0.95 # keep more tangential speed on bounce
+    wall_reentry_radial: float = 0.35   # stronger inward nudge after bounce (KO off)
+    wall_restitution_boost: float = 0.12 # extra restitution scaled by impact normal speed (KO off)
     wall_restitution_vref: float = 2.5   # m/s reference for restitution boost
-    wall_torque_coupling: float = 0.6    # converts tangential shear into extra spin loss
+    wall_torque_coupling: float = 0.3    # lower shear->spin coupling (less stamina loss on walls)
+    # Engagement steering (encourage battling near center)
+    engage_attraction_gain: float = 0.8   # base gain toward opponent (m/s^2)
+    engage_attraction_falloff: float = 0.6 # 0..inf, higher = weaker at long distance
+    engage_orbit_gain: float = 0.25       # small tangential bias around center (m/s^2)
+
+
+def _apply_engagement(a: RigidTop, b: RigidTop, stadium: Stadium, params: SimParams, dt: float):
+    # Steer toward each other with distance falloff
+    ab = v_sub(b.pos, a.pos)
+    d = v_len(ab)
+    if d > 1e-6:
+        abn = v_mul(ab, 1.0 / d)
+        r = stadium.radius_mm / 1000.0
+        fall = 1.0 / (1.0 + (d / max(1e-6, 0.6 * r)) ** (1.0 + params.engage_attraction_falloff))
+        acc = params.engage_attraction_gain * fall
+        a.vel = v_add(a.vel, v_mul(abn, acc * dt))
+        b.vel = v_sub(b.vel, v_mul(abn, acc * dt))
+    # Add slight orbiting around center to avoid straight lines
+    for top in (a, b):
+        rc = v_mul(top.pos, -1.0)
+        rl = v_len(rc)
+        if rl > 1e-6:
+            rcn = v_mul(rc, 1.0 / rl)
+            tperp = (-rcn[1], rcn[0])
+            top.vel = v_add(top.vel, v_mul(tperp, params.engage_orbit_gain * dt))
 
 
 def launch_state(combo: Combo, stadium: Stadium, rng: random.Random) -> RigidTop:
@@ -321,7 +354,9 @@ def step(top: RigidTop, stadium: Stadium, params: SimParams, rng: random.Random)
     wall_interaction(top, stadium, params, rng)
     # Effective stop threshold reduced by LAD (Life After Death)
     min_spin_eff = params.min_spin * (1.0 - 0.5 * top.combo.tip.lad)
-    if top.spin <= min_spin_eff:
+    # Sleep-out mechanics: if spin is very low OR both spin low-ish and linear speed tiny, treat as stopped
+    vmag = v_len(top.vel)
+    if top.spin <= min_spin_eff or (top.spin <= 1.2 * min_spin_eff and vmag <= 0.05):
         top.alive = False
 
 
@@ -333,6 +368,8 @@ def simulate_duel(a_combo: Combo, b_combo: Combo, stadium: Stadium, params: SimP
     time = 0.0
     last_contact_t = -999.0
     while time < params.max_time and (a.alive or b.alive):
+        # Engagement steering then collision check
+        _apply_engagement(a, b, stadium, params, params.dt)
         # Collision check before moving too far
         resolve_collision(a, b, params, rng)
         step(a, stadium, params, rng)
@@ -384,6 +421,7 @@ def simulate_duel_steps(a_combo: Combo, b_combo: Combo, stadium: Stadium, params
     t = 0.0
     yield {"t": t, "a": a, "b": b}
     while t < params.max_time and (a.alive or b.alive):
+        _apply_engagement(a, b, stadium, params, params.dt)
         resolve_collision(a, b, params, rng)
         step(a, stadium, params, rng)
         step(b, stadium, params, rng)
