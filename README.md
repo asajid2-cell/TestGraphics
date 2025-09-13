@@ -1,9 +1,8 @@
-<<<<<<< HEAD
-Beyblade Metal Fight Limited — Battle Simulator
+
 
 Overview
 
-This repository contains a lightweight, extensible simulator to model Beyblade Metal Fight Limited (MFL) battles. It focuses on realistic-but-approximate physics for the BB-10 Attack Type stadium, and a composable data model for parts. The goal is to enable quick Monte Carlo experiments over different part combinations and launch parameters to estimate win rates and outcome distributions (KO, sleep-out, etc.).
+This repository contains a lightweight, extensible simulator to model MFL battles. It focuses on realistic-but-approximate physics for the BB-10 Attack Type stadium, and a composable data model for parts. The goal is to enable quick Monte Carlo experiments over different part combinations and launch parameters to estimate win rates and outcome distributions (KO, sleep-out, etc.).
 
 Important Notes
 
